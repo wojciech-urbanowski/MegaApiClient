@@ -25,9 +25,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #endregion
 
-using System;
-using System.Security.Cryptography;
 using Newtonsoft.Json;
+using System;
+using System.Linq;
+using System.Security.Cryptography;
 
 namespace CG.Web.MegaApiClient
 {
@@ -137,10 +138,41 @@ namespace CG.Web.MegaApiClient
         {
             byte[] decryptedAttributes = DecryptAes(attributes, nodeKey);
 
-            // Remove MEGA prefix
             try
             {
-                return JsonConvert.DeserializeObject<Attributes>(decryptedAttributes.ToUTF8String().Substring(4));
+                // Remove MEGA prefix
+                var decryptedAttributesString = decryptedAttributes.ToUTF8String().Substring(4);
+
+                // Remove trashy stuff. I've experienced decrypted attributes string to look like:
+                // "{\"n\":\"03968_silhouette_5120x2880.jpg\"}\0lib2\0"
+                // (notice additional characters after last '}')
+                {
+                    var openings = decryptedAttributesString.Count(c => c == '{');
+                    var closings = decryptedAttributesString.Count(c => c == '}');
+
+                    int indexOfLastMatchingClosing = 0;
+                    int count = 0;
+                    while (count < openings)
+                    {
+                        indexOfLastMatchingClosing = decryptedAttributesString.IndexOf('}', indexOfLastMatchingClosing);
+                        if (indexOfLastMatchingClosing < 0)
+                        {
+                            count = -1;
+                            break;
+                        }
+                        count++;
+                    }
+
+                    if (count >= 0)
+                    {
+                        if (indexOfLastMatchingClosing != decryptedAttributesString.Length - 1)
+                        {
+                            decryptedAttributesString = decryptedAttributesString.Substring(0, indexOfLastMatchingClosing + 1);
+                        }
+                    }
+                }
+
+                return JsonConvert.DeserializeObject<Attributes>(decryptedAttributesString);
             }
             catch (Exception ex)
             {
