@@ -10,7 +10,7 @@ namespace CG.Web.MegaApiClient.Tests
 {
     public abstract class DownloadUpload : TestsBase
     {
-        private readonly Random random = new Random();
+        protected readonly Random random = new Random();
 
         protected DownloadUpload(Options options)
             : base(options)

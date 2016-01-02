@@ -48,10 +48,13 @@ namespace CG.Web.MegaApiClient
         public DateTime LastModificationDate { get; private set; }
 
         [JsonIgnore]
-        public byte[] DecryptedKey { get; private set; }
+        public byte[] Key { get; private set; }
 
         [JsonIgnore]
-        public byte[] Key { get; private set; }
+        public byte[] FullKey { get; private set; }
+
+        [JsonIgnore]
+        public byte[] SharedKey { get; private set; }
 
         [JsonIgnore]
         public byte[] Iv { get; private set; }
@@ -101,9 +104,6 @@ namespace CG.Web.MegaApiClient
                     int splitPosition = serializedKey.IndexOf(":", StringComparison.InvariantCulture);
                     byte[] encryptedKey = serializedKey.Substring(splitPosition + 1).FromBase64();
 
-                    this.DecryptedKey = Crypto.DecryptKey(encryptedKey, masterKey);
-                    this.Key = this.DecryptedKey;
-
                     // If node is shared, we need to retrieve shared masterkey
                     if (nodesResponse.SharedKeys != null)
                     {
@@ -114,25 +114,29 @@ namespace CG.Web.MegaApiClient
                             masterKey = Crypto.DecryptKey(sharedKey.Key.FromBase64(), masterKey);
                             if (this.Type == NodeType.Directory)
                             {
-                                this.DecryptedKey = masterKey;
+                                this.SharedKey = masterKey;
                             }
                             else
                             {
-                                this.DecryptedKey = Crypto.DecryptKey(encryptedKey, masterKey);
+                                this.SharedKey = Crypto.DecryptKey(encryptedKey, masterKey);
                             }
-
-                            this.Key = Crypto.DecryptKey(encryptedKey, masterKey);
                         }
                     }
+
+                    this.FullKey = Crypto.DecryptKey(encryptedKey, masterKey);
 
                     if (this.Type == NodeType.File)
                     {
                         byte[] iv, metaMac, fileKey;
-                        Crypto.GetPartsFromDecryptedKey(this.DecryptedKey, out iv, out metaMac, out fileKey);
+                        Crypto.GetPartsFromDecryptedKey(this.FullKey, out iv, out metaMac, out fileKey);
 
                         this.Iv = iv;
                         this.MetaMac = metaMac;
                         this.Key = fileKey;
+                    }
+                    else
+                    {
+                        this.Key = this.FullKey;
                     }
 
                     Attributes attributes = Crypto.DecryptAttributes(this.SerializedAttributes.FromBase64(), this.Key);
